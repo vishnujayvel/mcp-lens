@@ -1,0 +1,36 @@
+# Binaries
+/mcp-lens
+/build/
+/dist/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+/vendor/
+go.sum
+
+# Node (if using for dashboard)
+node_modules/
+npm-debug.log
+
+# Test coverage
+coverage/
+*.cover
+*.out
+
+# Environment
+.env
+.env.local
