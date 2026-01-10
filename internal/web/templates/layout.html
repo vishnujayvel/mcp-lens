@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - MCP Lens</title>
+    <script src="/static/js/htmx.min.js"></script>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="/">🔍 MCP Lens</a>
+        </div>
+        <div class="nav-links">
+            <a href="/" class="nav-link">Dashboard</a>
+            <a href="/mcp" class="nav-link">MCP Servers</a>
+            <a href="/tools" class="nav-link">Tools</a>
+            <a href="/costs" class="nav-link">Costs</a>
+            <a href="/sessions" class="nav-link">Sessions</a>
+        </div>
+    </nav>
+    <main class="container">
+        {{template "content" .}}
+    </main>
+    <footer class="footer">
+        <p>MCP Lens - Claude Code Observability Dashboard</p>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{{range .}}
+<tr>
+    <td><strong>{{.ServerName}}</strong></td>
+    <td>{{formatNumber .CallCount}}</td>
+    <td>{{formatPercent .Percentage}}</td>
+    <td class="{{if lt .SuccessRate 90.0}}text-warning{{end}}">{{formatPercent .SuccessRate}}</td>
+    <td>{{printf "%.0f" .AvgLatencyMs}}ms</td>
+</tr>
+{{else}}
+<tr>
+    <td colspan="5" class="text-muted">No MCP server activity</td>
+</tr>
+{{end}}

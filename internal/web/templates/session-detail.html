@@ -1,0 +1,64 @@
+{{define "content"}}
+<div class="page">
+    <div class="page-header">
+        <a href="/sessions" class="btn btn-sm">← Back to Sessions</a>
+        <h1>{{.Title}}</h1>
+    </div>
+
+    <div class="session-info">
+        <div class="info-row">
+            <span class="info-label">Session ID:</span>
+            <code>{{.Session.ID}}</code>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Working Directory:</span>
+            <code>{{if .Session.Cwd}}{{.Session.Cwd}}{{else}}-{{end}}</code>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Started:</span>
+            <span>{{formatTime .Session.StartedAt}}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Ended:</span>
+            <span>{{if .Session.EndedAt}}{{formatTime .Session.EndedAt}}{{else}}<span class="badge badge-active">Active</span>{{end}}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Events:</span>
+            <span>{{.Session.TotalEvents}}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Tokens:</span>
+            <span>{{formatNumber .Session.TotalTokens}}</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Cost:</span>
+            <span>{{formatCost .Session.TotalCostUSD}}</span>
+        </div>
+    </div>
+
+    <section class="section">
+        <h2>Events</h2>
+        <div class="events-timeline">
+            {{range .Events}}
+            <div class="timeline-item">
+                <div class="timeline-marker {{.EventType}}"></div>
+                <div class="timeline-content">
+                    <div class="timeline-header">
+                        <span class="event-type {{.EventType}}">{{.EventType}}</span>
+                        {{if .ToolName}}<span class="event-tool">{{.ToolName}}</span>{{end}}
+                        {{if .MCPServer}}<span class="event-mcp">{{.MCPServer}}</span>{{end}}
+                    </div>
+                    <div class="timeline-meta">
+                        <span>{{formatTime .CreatedAt}}</span>
+                        {{if .DurationMs}}<span>{{.DurationMs}}ms</span>{{end}}
+                        {{if not .Success}}<span class="badge badge-error">Failed</span>{{end}}
+                    </div>
+                </div>
+            </div>
+            {{else}}
+            <p class="text-muted">No events recorded for this session</p>
+            {{end}}
+        </div>
+    </section>
+</div>
+{{end}}

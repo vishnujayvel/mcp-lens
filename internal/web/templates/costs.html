@@ -1,0 +1,71 @@
+{{define "content"}}
+<div class="page">
+    <h1>Cost Analytics</h1>
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-value">{{formatCost .Summary.TotalCostUSD}}</div>
+            <div class="metric-label">Total Cost</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{formatNumber .Summary.TotalTokens}}</div>
+            <div class="metric-label">Total Tokens</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{formatNumber .Summary.InputTokens}}</div>
+            <div class="metric-label">Input Tokens</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{formatNumber .Summary.OutputTokens}}</div>
+            <div class="metric-label">Output Tokens</div>
+        </div>
+    </div>
+
+    <section class="section">
+        <h2>Cost Forecast</h2>
+        <div class="forecast-grid">
+            <div class="forecast-card">
+                <div class="forecast-value">{{formatCost .Forecast.DailyAverage}}</div>
+                <div class="forecast-label">Daily Average</div>
+            </div>
+            <div class="forecast-card">
+                <div class="forecast-value">{{formatCost .Forecast.WeeklyEstimate}}</div>
+                <div class="forecast-label">Weekly Estimate</div>
+            </div>
+            <div class="forecast-card">
+                <div class="forecast-value">{{formatCost .Forecast.MonthlyEstimate}}</div>
+                <div class="forecast-label">Monthly Estimate</div>
+            </div>
+        </div>
+        <p class="text-muted">Based on {{.Forecast.DataDays}} days of data. Confidence: {{.Forecast.Confidence}}</p>
+    </section>
+
+    {{if .ByModel}}
+    <section class="section">
+        <h2>Cost by Model</h2>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Input Tokens</th>
+                        <th>Output Tokens</th>
+                        <th>Cost</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .ByModel}}
+                    <tr>
+                        <td><strong>{{.Model}}</strong></td>
+                        <td>{{formatNumber .InputTokens}}</td>
+                        <td>{{formatNumber .OutputTokens}}</td>
+                        <td>{{formatCost .TotalCostUSD}}</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {{end}}
+</div>
+{{end}}

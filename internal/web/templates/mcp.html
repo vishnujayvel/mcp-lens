@@ -1,0 +1,56 @@
+{{define "content"}}
+<div class="page">
+    <h1>MCP Servers</h1>
+
+    <div class="summary-bar">
+        <div class="summary-item">
+            <span class="summary-value">{{len .Servers}}</span>
+            <span class="summary-label">Active Servers</span>
+        </div>
+        <div class="summary-item">
+            <span class="summary-value">{{formatNumber .TotalCalls}}</span>
+            <span class="summary-label">Total Calls</span>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Server Name</th>
+                    <th>Total Calls</th>
+                    <th>Utilization</th>
+                    <th>Success Rate</th>
+                    <th>Avg Latency</th>
+                    <th>Trend</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Servers}}
+                <tr>
+                    <td><strong>{{.ServerName}}</strong></td>
+                    <td>{{formatNumber .CallCount}}</td>
+                    <td>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {{printf "%.0f" .Percentage}}%"></div>
+                        </div>
+                        <span>{{formatPercent .Percentage}}</span>
+                    </td>
+                    <td class="{{if lt .SuccessRate 90.0}}text-error{{else if lt .SuccessRate 99.0}}text-warning{{else}}text-success{{end}}">
+                        {{formatPercent .SuccessRate}}
+                    </td>
+                    <td>{{printf "%.0f" .AvgLatencyMs}}ms</td>
+                    <td>
+                        {{if eq .TrendDirection "up"}}📈{{else if eq .TrendDirection "down"}}📉{{else}}➡️{{end}}
+                    </td>
+                </tr>
+                {{else}}
+                <tr>
+                    <td colspan="6" class="text-muted">No MCP servers have been used yet</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{end}}

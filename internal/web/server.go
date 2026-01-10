@@ -6,6 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"net/http"
 	"time"
@@ -192,7 +193,7 @@ type templateRenderer struct {
 	templates *template.Template
 }
 
-func (t *templateRenderer) Render(w http.ResponseWriter, name string, data interface{}, c echo.Context) error {
+func (t *templateRenderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
 	return t.templates.ExecuteTemplate(w, name, data)
 }
 
