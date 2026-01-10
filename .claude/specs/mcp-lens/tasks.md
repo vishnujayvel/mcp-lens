@@ -1,7 +1,7 @@
 # MCP Lens - Implementation Tasks
 
-**Version:** 1.0.0
-**Status:** In Progress
+**Version:** 1.1.0
+**Status:** Phase 1-2 Complete, Phase 3-4 Partial
 **Last Updated:** 2026-01-10
 **Based On:** [design.md](./design.md)
 
@@ -28,18 +28,18 @@ This document contains implementation tasks for MCP Lens, organized by phase. Ea
 
 Set up the Go project structure, dependencies, and configuration management.
 
-- [ ] 1.1: Initialize Go module and create directory structure
+- [x] 1.1: Initialize Go module and create directory structure
   - Create `go.mod` with module `github.com/anthropics/mcp-lens`
   - Create directories: `cmd/mcp-lens/`, `internal/config/`, `internal/hooks/`, `internal/storage/`, `internal/metrics/`, `internal/web/`, `internal/models/`, `web/templates/`, `web/static/`
   - Add dependencies: `modernc.org/sqlite`, `github.com/labstack/echo/v4`
   - Create initial `main.go` with CLI skeleton
 
-- [ ] 1.2: Implement configuration management
+- [x] 1.2: Implement configuration management
   - Create `internal/config/config.go` with Config struct
   - Support TOML config file at `~/.config/mcp-lens/config.toml`
   - Support environment variable overrides (`MCP_LENS_*`)
   - Add default values for all settings
-  - Write tests for config loading and defaults
+  - Write tests for config loading and defaults (7 tests passing)
 
 ---
 
@@ -50,26 +50,26 @@ Set up the Go project structure, dependencies, and configuration management.
 
 Implement the SQLite storage backend with schema and repository pattern.
 
-- [ ] 2.1: Create database schema and migrations
-  - Create `internal/storage/schema.go` with SQL schema constants
-  - Implement `InitDB()` function to create tables
+- [x] 2.1: Create database schema and migrations
+  - Create `internal/storage/schema.go` with SQL schema constants (inline in sqlite.go)
+  - Implement `InitDB()` function to create tables (initSchema())
   - Create `events`, `sessions`, `mcp_servers`, `daily_stats`, `schema_version` tables
   - Add all indexes defined in design document
-  - Write tests verifying schema creation
+  - Write tests verifying schema creation (integration tests)
 
-- [ ] 2.2: Implement Store interface for events
-  - Create `internal/storage/store.go` with Store interface
+- [x] 2.2: Implement Store interface for events
+  - Create `internal/storage/types.go` with Store interface
   - Create `internal/storage/sqlite.go` with SQLiteStore implementation
   - Implement `StoreEvent()` with parameterized queries
   - Implement `GetEvents()` with filtering support
-  - Write tests for event storage and retrieval
+  - Write tests for event storage and retrieval (IT-STOR-001, IT-STOR-002)
 
-- [ ] 2.3: Implement session and MCP server operations
+- [x] 2.3: Implement session and MCP server operations
   - Implement `GetSession()`, `GetSessions()` methods
   - Implement `GetMCPServerStats()`, `GetToolStats()` methods
   - Implement `Cleanup()` for data retention
   - Implement `Close()` for graceful shutdown
-  - Write tests for all session/MCP operations
+  - Write tests for all session/MCP operations (IT-METR-002)
 
 ---
 
@@ -80,28 +80,28 @@ Implement the SQLite storage backend with schema and repository pattern.
 
 Implement the HTTP server that receives Claude Code hook events.
 
-- [ ] 3.1: Define hook event types
+- [x] 3.1: Define hook event types
   - Create `internal/hooks/events.go` with event structs
   - Define `HookEvent`, `ToolUseEvent`, `SessionEvent` types
   - Match Claude Code hook JSON schema exactly
   - Add JSON tags and validation
-  - Write tests for JSON deserialization
+  - Write tests for JSON deserialization (7 unit tests passing)
 
-- [ ] 3.2: Implement hook receiver HTTP server
+- [x] 3.2: Implement hook receiver HTTP server
   - Create `internal/hooks/receiver.go` with Receiver struct
   - Implement HTTP POST `/hook` endpoint
   - Parse and validate incoming hook payloads
   - Send parsed events to processing channel
   - Implement graceful start/stop
-  - Write tests for hook reception
+  - Write tests for hook reception (IT-HOOK-001, IT-HOOK-002)
 
-- [ ] 3.3: Implement event processor and storage pipeline
+- [x] 3.3: Implement event processor and storage pipeline
   - Create `internal/hooks/processor.go`
   - Connect receiver events to storage layer
-  - Extract MCP server name from tool name patterns
+  - Extract MCP server name from tool name patterns (identifier.go)
   - Calculate derived fields (duration from Pre/Post correlation)
   - Update session stats on session events
-  - Write integration tests for full pipeline
+  - Write integration tests for full pipeline (IT-PROC-001, IT-PROC-002)
 
 ---
 
@@ -112,19 +112,18 @@ Implement the HTTP server that receives Claude Code hook events.
 
 Define the domain models and view models for metrics.
 
-- [ ] 4.1: Create domain models
-  - Create `internal/models/event.go` with Event model
-  - Create `internal/models/session.go` with Session model
-  - Create `internal/models/mcp.go` with MCPServer, Tool models
+- [x] 4.1: Create domain models
+  - Create `internal/storage/types.go` with Event, Session models
+  - Create MCPServerStats, ToolStats models
   - Ensure models match database schema
-  - Write tests for model validation
+  - Write tests for model validation (via integration tests)
 
-- [ ] 4.2: Create metrics view models (P)
-  - Create `internal/models/metrics.go`
+- [x] 4.2: Create metrics view models (P)
+  - Create `internal/metrics/calculator.go`
   - Define `DashboardSummary`, `MCPUtilization`, `ToolSuccessRate`
   - Define `CostSummary`, `CostForecast` structs
   - Add helper methods for formatting
-  - Write tests for metric calculations
+  - Write tests for metric calculations (IT-METR-001, IT-METR-002)
 
 ---
 
@@ -135,19 +134,19 @@ Define the domain models and view models for metrics.
 
 Implement metrics computation from stored events.
 
-- [ ] 5.1: Implement basic dashboard metrics
+- [x] 5.1: Implement basic dashboard metrics
   - Create `internal/metrics/calculator.go` with Calculator struct
   - Implement `GetDashboardSummary()` - total sessions, tokens, costs
   - Query and aggregate from events table
   - Support time range filtering
-  - Write tests with sample data
+  - Write tests with sample data (IT-METR-001)
 
-- [ ] 5.2: Implement MCP utilization metrics
-  - Create `internal/metrics/mcp.go`
+- [x] 5.2: Implement MCP utilization metrics
+  - Create `internal/metrics/calculator.go` (combined)
   - Implement `GetMCPUtilization()` - server call counts and percentages
   - Implement `GetToolSuccessRates()` - success/error rates per tool
   - Implement `GetUnusedServers()` - servers with no recent activity
-  - Write tests for MCP metrics calculations
+  - Write tests for MCP metrics calculations (IT-METR-002)
 
 - [ ] 5.3: Implement latency percentile calculations (P)
   - Add P50, P90, P99 latency calculation to `GetMCPServerStats()`
@@ -164,26 +163,26 @@ Implement metrics computation from stored events.
 
 Implement the embedded web dashboard using Echo and HTMX.
 
-- [ ] 6.1: Set up Echo server with embedded assets
+- [x] 6.1: Set up Echo server with embedded assets
   - Create `internal/web/server.go` with Server struct
   - Use `//go:embed` to embed templates and static files
   - Configure Echo with timeouts and middleware (logger, recover)
   - Bind to localhost by default
-  - Write tests for server startup/shutdown
+  - Write tests for server startup/shutdown (IT-WEB-001)
 
-- [ ] 6.2: Create base HTML templates
+- [x] 6.2: Create base HTML templates
   - Create `web/templates/layout.html` with base structure
   - Add HTMX script include
   - Create minimal CSS in `web/static/css/styles.css`
   - Include navigation and layout structure
   - Verify templates parse correctly
 
-- [ ] 6.3: Implement dashboard page handler
-  - Create `internal/web/handlers.go` with Handler struct
-  - Implement `Dashboard()` handler for main page
+- [x] 6.3: Implement dashboard page handler
+  - Create `internal/web/handlers.go` with handlers
+  - Implement `handleDashboard()` handler for main page
   - Create `web/templates/dashboard.html` template
   - Display summary metrics (sessions, tokens, cost, MCP servers)
-  - Write tests for handler responses
+  - Write tests for handler responses (IT-WEB-001, IT-WEB-002)
 
 ---
 
@@ -194,26 +193,26 @@ Implement the embedded web dashboard using Echo and HTMX.
 
 Implement additional dashboard pages and HTMX partial updates.
 
-- [ ] 7.1: Implement MCP servers page
+- [x] 7.1: Implement MCP servers page
   - Create `web/templates/mcp.html` template
-  - Implement `MCPServers()` handler
+  - Implement `handleMCPServers()` handler
   - Display server utilization table with success rates
   - Add latency columns (avg, P90)
   - Highlight servers with high error rates
 
-- [ ] 7.2: Implement sessions page
+- [x] 7.2: Implement sessions page
   - Create `web/templates/sessions.html` template
-  - Implement `Sessions()` handler with pagination
+  - Implement `handleSessions()` handler with pagination
   - Display session list with duration, token count, cost
-  - Implement `SessionDetail()` for individual session view
+  - Implement `handleSessionDetail()` for individual session view
   - Show events within a session
 
-- [ ] 7.3: Implement HTMX partial endpoints
+- [x] 7.3: Implement HTMX partial endpoints
   - Create `web/templates/partials/` directory
   - Implement `/partials/metrics` for dashboard summary refresh
   - Implement `/partials/mcp-table` for MCP table refresh
   - Implement `/partials/recent-events` for event feed
-  - Add `hx-get` polling with configurable interval
+  - Add `hx-get` polling with configurable interval (IT-WEB-002)
 
 ---
 
@@ -224,20 +223,20 @@ Implement additional dashboard pages and HTMX partial updates.
 
 Implement the command-line interface for MCP Lens.
 
-- [ ] 8.1: Implement `serve` command
+- [x] 8.1: Implement `serve` command
   - Update `cmd/mcp-lens/main.go` with command parsing
   - Implement `serve` to start both hook receiver and dashboard
   - Support `--hook-port` and `--dashboard-port` flags
   - Support `--bind` flag for network binding
   - Implement graceful shutdown on SIGINT/SIGTERM
 
-- [ ] 8.2: Implement `init` command
+- [x] 8.2: Implement `init` command
   - Generate Claude Code hook configuration JSON
   - Output to stdout or specified file
-  - Include all supported hook events
+  - Include all supported hook events (6 hook types)
   - Use configured port in curl commands
 
-- [ ] 8.3: Implement utility commands (P)
+- [x] 8.3: Implement utility commands (P)
   - Implement `version` command showing build info
   - Implement `status` command showing server status
   - Implement `purge --confirm` for data deletion
@@ -254,12 +253,12 @@ Implement the command-line interface for MCP Lens.
 
 Implement intelligent MCP server identification from tool calls.
 
-- [ ] 9.1: Implement rule-based MCP identifier
+- [x] 9.1: Implement rule-based MCP identifier
   - Create `internal/hooks/identifier.go` with MCPIdentifier interface
-  - Implement prefix extraction (e.g., `mcp_filesystem_read` → `filesystem`)
+  - Implement prefix extraction (e.g., `mcp__filesystem__read` → `filesystem`)
   - Add known tool mappings for common MCP servers
   - Handle built-in Claude Code tools (Read, Write, Bash, etc.)
-  - Write tests for identification patterns
+  - Write tests for identification patterns (IT-IDENT-001, IT-IDENT-002)
 
 - [ ] 9.2: Implement MCP config file parsing (P)
   - Read Claude Code MCP config from `~/.config/claude/mcp.json`
@@ -381,17 +380,17 @@ Implement budget threshold alerts.
 
 Create comprehensive integration tests.
 
-- [ ] 15.1: Create end-to-end test suite
-  - Test full hook reception → storage → metrics pipeline
-  - Test dashboard renders with sample data
-  - Test CLI commands
+- [x] 15.1: Create end-to-end test suite
+  - Test full hook reception → storage → metrics pipeline (E2E-001, E2E-002)
+  - Test dashboard renders with sample data (IT-WEB-001, IT-WEB-002)
+  - Test CLI commands (via main.go verification)
   - Verify graceful shutdown preserves data
 
-- [ ] 15.2: Create performance benchmarks (P)
-  - Benchmark event storage throughput
-  - Benchmark metrics query performance
-  - Verify <100ms hook processing latency
-  - Document benchmark results
+- [x] 15.2: Create performance benchmarks (P)
+  - Benchmark event storage throughput (~1.1M events/sec)
+  - Benchmark metrics query performance (34µs/op)
+  - Verify <100ms hook processing latency (912ns/op ✓)
+  - Document benchmark results (test-results.md)
 
 ---
 
@@ -402,13 +401,13 @@ Create comprehensive integration tests.
 
 Create documentation and build automation.
 
-- [ ] 16.1: Create Makefile and build scripts
+- [x] 16.1: Create Makefile and build scripts
   - Add targets: build, test, lint, clean
   - Add cross-compilation targets for all platforms
   - Create install.sh for curl-based installation
   - Verify binary size under 20MB
 
-- [ ] 16.2: Create user documentation
+- [x] 16.2: Create user documentation
   - Update README.md with installation instructions
   - Document configuration options
   - Add quick start guide

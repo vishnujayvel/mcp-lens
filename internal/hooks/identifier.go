@@ -118,9 +118,13 @@ func (r *RuleBasedIdentifier) Identify(toolName string, toolInput map[string]int
 	// Try to extract from underscore-separated name
 	// e.g., "my_custom_server_do_thing" -> "my_custom_server"
 	parts := strings.Split(toolName, "_")
-	if len(parts) >= 2 && !strings.HasPrefix(toolName, "mcp") {
-		// Take all but the last part as the server name (only if not mcp prefix)
-		return strings.Join(parts[:len(parts)-1], "_")
+	if len(parts) >= 2 && !strings.HasPrefix(toolName, "mcp") && !strings.HasPrefix(toolName, "_") {
+		// Take all but the last part as the server name (only if not mcp prefix or leading underscore)
+		result := strings.Join(parts[:len(parts)-1], "_")
+		// Validate result is not empty or just underscores
+		if result != "" && strings.Trim(result, "_") != "" {
+			return result
+		}
 	}
 
 	// Unknown - could be a custom tool or built-in
