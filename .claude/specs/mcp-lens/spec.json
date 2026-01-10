@@ -2,12 +2,12 @@
   "name": "mcp-lens",
   "version": "0.1.0",
   "description": "Lightweight observability dashboard for Claude Code with MCP server intelligence",
-  "status": "requirements",
+  "status": "design",
   "language": "en",
   "created": "2026-01-09",
-  "updated": "2026-01-09",
+  "updated": "2026-01-10",
   "phases": {
-    "requirements": "in_progress",
+    "requirements": "completed",
     "design": "pending",
     "tasks": "pending",
     "implementation": "pending"
