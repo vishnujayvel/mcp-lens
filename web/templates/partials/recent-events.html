@@ -1,0 +1,9 @@
+{{range .}}
+<div class="event-item">
+    <span class="event-type {{.EventType}}">{{.EventType}}</span>
+    {{if .ToolName}}<span class="event-tool">{{.ToolName}}</span>{{end}}
+    <span class="event-time">{{formatTime .CreatedAt}}</span>
+</div>
+{{else}}
+<p class="text-muted">No recent events</p>
+{{end}}

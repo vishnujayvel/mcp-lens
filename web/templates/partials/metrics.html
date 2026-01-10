@@ -1,0 +1,16 @@
+<div class="metric-card">
+    <div class="metric-value">{{.TotalSessions}}</div>
+    <div class="metric-label">Sessions</div>
+</div>
+<div class="metric-card">
+    <div class="metric-value">{{formatNumber .TotalTokens}}</div>
+    <div class="metric-label">Tokens</div>
+</div>
+<div class="metric-card">
+    <div class="metric-value">{{formatCost .TotalCostUSD}}</div>
+    <div class="metric-label">Total Cost</div>
+</div>
+<div class="metric-card">
+    <div class="metric-value">{{.ActiveMCPServers}}</div>
+    <div class="metric-label">Active MCP Servers</div>
+</div>
