@@ -2,7 +2,7 @@
   "name": "mcp-lens",
   "version": "0.1.0",
   "description": "Lightweight observability dashboard for Claude Code with MCP server intelligence",
-  "status": "tasks",
+  "status": "implementation",
   "language": "en",
   "created": "2026-01-09",
   "updated": "2026-01-10",
@@ -10,7 +10,7 @@
     "requirements": "completed",
     "design": "completed",
     "tasks": "completed",
-    "implementation": "pending"
+    "implementation": "in_progress"
   },
   "tags": ["observability", "claude-code", "mcp", "telemetry", "dashboard"]
 }

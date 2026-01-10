@@ -1,7 +1,7 @@
 # MCP Lens - Implementation Tasks
 
 **Version:** 1.0.0
-**Status:** Draft
+**Status:** In Progress
 **Last Updated:** 2026-01-10
 **Based On:** [design.md](./design.md)
 
