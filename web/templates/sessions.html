@@ -1,0 +1,50 @@
+{{define "content"}}
+<div class="page">
+    <h1>Sessions</h1>
+
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Session ID</th>
+                    <th>Started</th>
+                    <th>Duration</th>
+                    <th>Events</th>
+                    <th>Tokens</th>
+                    <th>Cost</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Sessions}}
+                <tr>
+                    <td><code>{{slice .ID 0 8}}...</code></td>
+                    <td>{{formatTime .StartedAt}}</td>
+                    <td>
+                        {{if .EndedAt}}
+                            {{formatDuration ((.EndedAt).Sub .StartedAt)}}
+                        {{else}}
+                            <span class="badge badge-active">Active</span>
+                        {{end}}
+                    </td>
+                    <td>{{.TotalEvents}}</td>
+                    <td>{{formatNumber .TotalTokens}}</td>
+                    <td>{{formatCost .TotalCostUSD}}</td>
+                    <td><a href="/sessions/{{.ID}}" class="btn btn-sm">View</a></td>
+                </tr>
+                {{else}}
+                <tr>
+                    <td colspan="7" class="text-muted">No sessions recorded yet</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+
+    {{if .HasMore}}
+    <div class="pagination">
+        <a href="?page={{add .Page 1}}" class="btn">Load More</a>
+    </div>
+    {{end}}
+</div>
+{{end}}

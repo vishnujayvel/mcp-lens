@@ -8,8 +8,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/anthropics/mcp-lens/internal/config"
+	"github.com/anthropics/mcp-lens/internal/hooks"
+	"github.com/anthropics/mcp-lens/internal/storage"
+	"github.com/anthropics/mcp-lens/internal/web"
 )
 
 var (
@@ -118,15 +122,60 @@ func runServe(args []string) {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
+	// Initialize storage
+	store, err := storage.NewSQLiteStore(cfg.Storage.DatabasePath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error opening database: %v\n", err)
+		os.Exit(1)
+	}
+	defer store.Close()
+
+	// Initialize hook receiver
+	receiver := hooks.NewReceiver(hooks.ReceiverConfig{
+		Port:        cfg.Server.HookPort,
+		BindAddress: cfg.Server.BindAddress,
+	})
+
+	// Initialize event processor
+	processor := hooks.NewProcessor(store, receiver.Events())
+
+	// Initialize web dashboard
+	webServer, err := web.NewServer(web.ServerConfig{
+		Port:            cfg.Server.DashboardPort,
+		BindAddress:     cfg.Server.BindAddress,
+		RefreshInterval: cfg.Dashboard.RefreshInterval,
+	}, store)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating web server: %v\n", err)
+		os.Exit(1)
+	}
+
 	fmt.Printf("MCP Lens starting...\n")
 	fmt.Printf("  Hook receiver: http://%s\n", cfg.HookAddress())
 	fmt.Printf("  Dashboard:     http://%s\n", cfg.DashboardAddress())
 	fmt.Printf("  Database:      %s\n", cfg.Storage.DatabasePath)
 	fmt.Println()
-	fmt.Println("Press Ctrl+C to stop")
 
-	// TODO: Start hook receiver and dashboard servers
-	// This will be implemented in Task 3 and Task 6
+	// Start hook receiver
+	if err := receiver.Start(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Error starting hook receiver: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("Hook receiver started")
+
+	// Start event processor
+	processor.Start(ctx)
+	fmt.Println("Event processor started")
+
+	// Start web dashboard
+	if err := webServer.Start(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "Error starting web server: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("Dashboard started")
+
+	fmt.Println()
+	fmt.Println("Press Ctrl+C to stop")
 
 	// Wait for shutdown signal
 	select {
@@ -135,6 +184,14 @@ func runServe(args []string) {
 		cancel()
 	case <-ctx.Done():
 	}
+
+	// Graceful shutdown
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	processor.Stop()
+	receiver.Stop(shutdownCtx)
+	webServer.Stop(shutdownCtx)
 
 	fmt.Println("MCP Lens stopped")
 }

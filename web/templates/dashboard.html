@@ -1,0 +1,85 @@
+{{define "content"}}
+<div class="dashboard">
+    <h1>Dashboard</h1>
+
+    <div class="time-filter">
+        <a href="?range=1h" class="btn">1h</a>
+        <a href="?range=6h" class="btn">6h</a>
+        <a href="?range=24h" class="btn btn-active">24h</a>
+        <a href="?range=7d" class="btn">7d</a>
+        <a href="?range=30d" class="btn">30d</a>
+    </div>
+
+    <div class="metrics-grid" hx-get="/partials/metrics" hx-trigger="every {{.RefreshInterval}}s" hx-swap="innerHTML">
+        {{template "metrics-cards" .Summary}}
+    </div>
+
+    <div class="dashboard-sections">
+        <section class="section">
+            <h2>MCP Server Utilization</h2>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Server</th>
+                            <th>Calls</th>
+                            <th>%</th>
+                            <th>Success Rate</th>
+                            <th>Avg Latency</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .MCPUtilization}}
+                        <tr>
+                            <td><strong>{{.ServerName}}</strong></td>
+                            <td>{{formatNumber .CallCount}}</td>
+                            <td>{{formatPercent .Percentage}}</td>
+                            <td class="{{if lt .SuccessRate 90.0}}text-warning{{end}}">{{formatPercent .SuccessRate}}</td>
+                            <td>{{printf "%.0f" .AvgLatencyMs}}ms</td>
+                        </tr>
+                        {{else}}
+                        <tr>
+                            <td colspan="5" class="text-muted">No MCP server activity recorded</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>Recent Events</h2>
+            <div class="events-list" hx-get="/partials/recent-events" hx-trigger="every 10s" hx-swap="innerHTML">
+                {{range .RecentEvents}}
+                <div class="event-item">
+                    <span class="event-type {{.EventType}}">{{.EventType}}</span>
+                    {{if .ToolName}}<span class="event-tool">{{.ToolName}}</span>{{end}}
+                    <span class="event-time">{{formatTime .CreatedAt}}</span>
+                </div>
+                {{else}}
+                <p class="text-muted">No recent events</p>
+                {{end}}
+            </div>
+        </section>
+    </div>
+</div>
+{{end}}
+
+{{define "metrics-cards"}}
+<div class="metric-card">
+    <div class="metric-value">{{.TotalSessions}}</div>
+    <div class="metric-label">Sessions</div>
+</div>
+<div class="metric-card">
+    <div class="metric-value">{{formatNumber .TotalTokens}}</div>
+    <div class="metric-label">Tokens</div>
+</div>
+<div class="metric-card">
+    <div class="metric-value">{{formatCost .TotalCostUSD}}</div>
+    <div class="metric-label">Total Cost</div>
+</div>
+<div class="metric-card">
+    <div class="metric-value">{{.ActiveMCPServers}}</div>
+    <div class="metric-label">Active MCP Servers</div>
+</div>
+{{end}}
