@@ -89,6 +89,24 @@ func (r *RuleBasedIdentifier) Identify(toolName string, toolInput map[string]int
 		return server
 	}
 
+	// Check for double-underscore MCP naming convention: mcp__servername__toolname
+	if strings.HasPrefix(toolName, "mcp__") {
+		parts := strings.SplitN(toolName, "__", 3)
+		if len(parts) >= 2 {
+			return parts[1] // Return the server name
+		}
+	}
+
+	// Check for single-underscore MCP naming convention: mcp_servername_toolname
+	if strings.HasPrefix(toolName, "mcp_") {
+		// Remove "mcp_" prefix and split by underscore
+		rest := toolName[4:]
+		parts := strings.SplitN(rest, "_", 2)
+		if len(parts) >= 1 {
+			return parts[0] // Return the server name
+		}
+	}
+
 	// Check prefix rules
 	lowerName := strings.ToLower(toolName)
 	for prefix, server := range r.prefixRules {
@@ -100,8 +118,8 @@ func (r *RuleBasedIdentifier) Identify(toolName string, toolInput map[string]int
 	// Try to extract from underscore-separated name
 	// e.g., "my_custom_server_do_thing" -> "my_custom_server"
 	parts := strings.Split(toolName, "_")
-	if len(parts) >= 2 {
-		// Take all but the last part as the server name
+	if len(parts) >= 2 && !strings.HasPrefix(toolName, "mcp") {
+		// Take all but the last part as the server name (only if not mcp prefix)
 		return strings.Join(parts[:len(parts)-1], "_")
 	}
 

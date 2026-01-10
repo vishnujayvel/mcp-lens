@@ -1,0 +1,36 @@
+{{define "content"}}
+<div class="page">
+    <h1>Tool Analytics</h1>
+
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Tool Name</th>
+                    <th>MCP Server</th>
+                    <th>Total Calls</th>
+                    <th>Success Rate</th>
+                    <th>Error Rate</th>
+                    <th>Avg Latency</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Tools}}
+                <tr>
+                    <td><strong>{{.ToolName}}</strong></td>
+                    <td>{{if .MCPServer}}{{.MCPServer}}{{else}}<span class="text-muted">Built-in</span>{{end}}</td>
+                    <td>{{formatNumber .TotalCalls}}</td>
+                    <td class="text-success">{{formatPercent .SuccessRate}}</td>
+                    <td class="{{if gt .ErrorRate 0.0}}text-error{{end}}">{{formatPercent .ErrorRate}}</td>
+                    <td>{{printf "%.0f" .AvgLatencyMs}}ms</td>
+                </tr>
+                {{else}}
+                <tr>
+                    <td colspan="6" class="text-muted">No tool calls recorded yet</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{end}}
