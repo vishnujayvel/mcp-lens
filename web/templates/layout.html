@@ -4,27 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}} - MCP Lens</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script src="/static/js/htmx.min.js"></script>
     <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-brand">
-            <a href="/">🔍 MCP Lens</a>
+            <a href="/">MCP Lens</a>
         </div>
         <div class="nav-links">
             <a href="/" class="nav-link">Dashboard</a>
             <a href="/mcp" class="nav-link">MCP Servers</a>
             <a href="/tools" class="nav-link">Tools</a>
-            <a href="/costs" class="nav-link">Costs</a>
             <a href="/sessions" class="nav-link">Sessions</a>
         </div>
+        <div class="live-indicator">Live</div>
     </nav>
     <main class="container">
         {{template "content" .}}
     </main>
     <footer class="footer">
-        <p>MCP Lens - Claude Code Observability Dashboard</p>
+        <p>MCP Lens v0.1.0 • Claude Code Observability</p>
     </footer>
 </body>
 </html>

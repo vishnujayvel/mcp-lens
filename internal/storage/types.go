@@ -24,6 +24,10 @@ type Store interface {
 	GetCostSummary(ctx context.Context, filter TimeFilter) (*CostSummary, error)
 	GetCostByModel(ctx context.Context, filter TimeFilter) ([]ModelCost, error)
 
+	// TUI-specific operations (v2.0)
+	GetRecentEvents(ctx context.Context, limit int) ([]RecentEvent, error)
+	GetCallVolumeByHour(ctx context.Context, filter TimeFilter) ([]HourlyCallVolume, error)
+
 	// Maintenance
 	Cleanup(ctx context.Context, olderThan time.Time) (int64, error)
 	Close() error
@@ -118,4 +122,32 @@ type SessionFilter struct {
 	Cwd    string
 	Limit  int
 	Offset int
+}
+
+// RecentEvent represents an event in the recent events circular buffer.
+type RecentEvent struct {
+	ID         int64
+	Timestamp  time.Time
+	SessionID  string
+	EventType  string
+	ToolName   string
+	ServerName string
+	DurationMs int64
+	Success    bool
+}
+
+// HourlyCallVolume represents call volume aggregated by hour.
+type HourlyCallVolume struct {
+	Hour       time.Time
+	TotalCalls int64
+	Errors     int64
+}
+
+// AggregatedMCPStats holds aggregated stats for MCP servers from tool_stats table.
+type AggregatedMCPStats struct {
+	ServerName     string
+	TotalCalls     int64
+	TotalErrors    int64
+	TotalLatencyMs int64
+	AvgLatencyMs   float64
 }

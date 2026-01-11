@@ -1,5 +1,3 @@
-//go:build sqlite
-
 package storage
 
 import (
@@ -46,7 +44,7 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 
 func (s *SQLiteStore) initSchema() error {
 	schema := `
-	-- Core events table (append-only)
+	-- Core events table (append-only) - kept for backward compatibility
 	CREATE TABLE IF NOT EXISTS events (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		session_id TEXT NOT NULL,
@@ -90,7 +88,21 @@ func (s *SQLiteStore) initSchema() error {
 		total_errors INTEGER DEFAULT 0
 	);
 
-	-- Daily stats for performance
+	-- Daily stats / tool_stats for aggregated queries
+	CREATE TABLE IF NOT EXISTS tool_stats (
+		date TEXT NOT NULL,
+		tool_name TEXT NOT NULL,
+		server_name TEXT NOT NULL DEFAULT '',
+		call_count INTEGER DEFAULT 0,
+		error_count INTEGER DEFAULT 0,
+		total_latency_ms INTEGER DEFAULT 0,
+		PRIMARY KEY (date, tool_name)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_tool_stats_date ON tool_stats(date);
+	CREATE INDEX IF NOT EXISTS idx_tool_stats_server ON tool_stats(server_name);
+
+	-- Daily stats for performance (legacy, kept for compatibility)
 	CREATE TABLE IF NOT EXISTS daily_stats (
 		date DATE NOT NULL,
 		mcp_server TEXT,
@@ -106,13 +118,43 @@ func (s *SQLiteStore) initSchema() error {
 
 	CREATE INDEX IF NOT EXISTS idx_daily_stats_date ON daily_stats(date);
 
+	-- Recent events circular buffer (for TUI display)
+	CREATE TABLE IF NOT EXISTS recent_events (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		timestamp TEXT NOT NULL,
+		session_id TEXT NOT NULL,
+		event_type TEXT NOT NULL,
+		tool_name TEXT,
+		server_name TEXT,
+		duration_ms INTEGER,
+		success INTEGER
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_recent_events_ts ON recent_events(timestamp DESC);
+
+	-- Sync state (track JSONL processing position)
+	CREATE TABLE IF NOT EXISTS sync_state (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL
+	);
+
+	INSERT OR IGNORE INTO sync_state (key, value) VALUES ('position', '0');
+
+	-- Event fingerprints for deduplication
+	CREATE TABLE IF NOT EXISTS event_fingerprints (
+		fingerprint TEXT PRIMARY KEY,
+		created_at TEXT NOT NULL
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_fingerprints_created ON event_fingerprints(created_at);
+
 	-- Schema version
 	CREATE TABLE IF NOT EXISTS schema_version (
 		version INTEGER PRIMARY KEY,
 		applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
-	INSERT OR IGNORE INTO schema_version (version) VALUES (1);
+	INSERT OR IGNORE INTO schema_version (version) VALUES (2);
 	`
 
 	_, err := s.db.Exec(schema)
@@ -405,14 +447,22 @@ func (s *SQLiteStore) GetMCPServerStats(ctx context.Context, filter TimeFilter) 
 	for rows.Next() {
 		var st MCPServerStats
 		var avgLatency sql.NullFloat64
+		var lastUsed sql.NullString
 
 		err := rows.Scan(&st.ServerName, &st.TotalCalls, &st.SuccessCount,
-			&st.ErrorCount, &avgLatency, &st.LastUsedAt)
+			&st.ErrorCount, &avgLatency, &lastUsed)
 		if err != nil {
 			return nil, fmt.Errorf("scanning MCP stats: %w", err)
 		}
 
 		st.AvgLatencyMs = avgLatency.Float64
+		if lastUsed.Valid {
+			st.LastUsedAt, _ = time.Parse(time.RFC3339, lastUsed.String)
+			if st.LastUsedAt.IsZero() {
+				// Try alternate format
+				st.LastUsedAt, _ = time.Parse("2006-01-02 15:04:05.999999999-07:00", lastUsed.String)
+			}
+		}
 		stats = append(stats, st)
 	}
 
@@ -531,4 +581,261 @@ func (s *SQLiteStore) Cleanup(ctx context.Context, olderThan time.Time) (int64, 
 // Close closes the database connection.
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()
+}
+
+// ========== Sync Engine Methods (v2.0) ==========
+
+// GetSyncPosition returns the last synced JSONL file position.
+func (s *SQLiteStore) GetSyncPosition(ctx context.Context) (int64, error) {
+	var value string
+	err := s.db.QueryRowContext(ctx, "SELECT value FROM sync_state WHERE key = 'position'").Scan(&value)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("getting sync position: %w", err)
+	}
+
+	var pos int64
+	_, err = fmt.Sscanf(value, "%d", &pos)
+	return pos, err
+}
+
+// SetSyncPosition updates the sync position.
+func (s *SQLiteStore) SetSyncPosition(ctx context.Context, pos int64) error {
+	_, err := s.db.ExecContext(ctx,
+		"INSERT OR REPLACE INTO sync_state (key, value) VALUES ('position', ?)",
+		fmt.Sprintf("%d", pos))
+	return err
+}
+
+// UpsertToolStats updates aggregated tool statistics.
+func (s *SQLiteStore) UpsertToolStats(ctx context.Context, date string, toolName string, serverName string, calls int64, errors int64, latencyMs int64) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO tool_stats (date, tool_name, server_name, call_count, error_count, total_latency_ms)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(date, tool_name) DO UPDATE SET
+			call_count = call_count + excluded.call_count,
+			error_count = error_count + excluded.error_count,
+			total_latency_ms = total_latency_ms + excluded.total_latency_ms`,
+		date, toolName, serverName, calls, errors, latencyMs)
+	return err
+}
+
+// UpsertSession creates or updates a session.
+func (s *SQLiteStore) UpsertSession(ctx context.Context, id string, cwd string, startedAt time.Time) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO sessions (id, cwd, started_at, total_events)
+		VALUES (?, ?, ?, 0)
+		ON CONFLICT(id) DO UPDATE SET
+			cwd = COALESCE(NULLIF(excluded.cwd, ''), cwd)`,
+		id, cwd, startedAt)
+	return err
+}
+
+// UpdateSessionEnd sets the session end time.
+func (s *SQLiteStore) UpdateSessionEnd(ctx context.Context, id string, endedAt time.Time) error {
+	_, err := s.db.ExecContext(ctx,
+		"UPDATE sessions SET ended_at = ? WHERE id = ?",
+		endedAt, id)
+	return err
+}
+
+// IncrementSessionStats increments session statistics.
+func (s *SQLiteStore) IncrementSessionStats(ctx context.Context, id string, toolCalls int64, errors int64) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE sessions SET
+			total_events = total_events + ?
+		WHERE id = ?`,
+		toolCalls, id)
+	return err
+}
+
+// InsertRecentEvent adds an event to the recent events buffer.
+func (s *SQLiteStore) InsertRecentEvent(ctx context.Context, timestamp time.Time, sessionID string, eventType string, toolName string, serverName string, durationMs int64, success bool) error {
+	successInt := 0
+	if success {
+		successInt = 1
+	}
+
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO recent_events (timestamp, session_id, event_type, tool_name, server_name, duration_ms, success)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		timestamp.Format(time.RFC3339), sessionID, eventType, toolName, serverName, durationMs, successInt)
+	if err != nil {
+		return err
+	}
+
+	// Trim to keep only last 100 events
+	_, err = s.db.ExecContext(ctx, `
+		DELETE FROM recent_events WHERE id <= (
+			SELECT id FROM recent_events ORDER BY id DESC LIMIT 1 OFFSET 100
+		)`)
+	return err
+}
+
+// GetRecentEvents retrieves the most recent events from the buffer.
+func (s *SQLiteStore) GetRecentEvents(ctx context.Context, limit int) ([]RecentEvent, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT timestamp, session_id, event_type, tool_name, server_name, duration_ms, success
+		FROM recent_events
+		ORDER BY id DESC
+		LIMIT ?`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("querying recent events: %w", err)
+	}
+	defer rows.Close()
+
+	var events []RecentEvent
+	for rows.Next() {
+		var e RecentEvent
+		var timestamp string
+		var toolName, serverName sql.NullString
+		var durationMs sql.NullInt64
+		var success int
+
+		err := rows.Scan(&timestamp, &e.SessionID, &e.EventType, &toolName, &serverName, &durationMs, &success)
+		if err != nil {
+			return nil, fmt.Errorf("scanning recent event: %w", err)
+		}
+
+		e.Timestamp, _ = time.Parse(time.RFC3339, timestamp)
+		e.ToolName = toolName.String
+		e.ServerName = serverName.String
+		e.DurationMs = durationMs.Int64
+		e.Success = success == 1
+		events = append(events, e)
+	}
+
+	return events, rows.Err()
+}
+
+// GetMCPServerStatsAggregated retrieves MCP server stats from tool_stats table.
+func (s *SQLiteStore) GetMCPServerStatsAggregated(ctx context.Context, filter TimeFilter) ([]MCPServerStats, error) {
+	query := `
+		SELECT
+			server_name,
+			SUM(call_count) as total_calls,
+			SUM(call_count) - SUM(error_count) as success_count,
+			SUM(error_count) as error_count,
+			CASE WHEN SUM(call_count) > 0
+				 THEN SUM(total_latency_ms) * 1.0 / SUM(call_count)
+				 ELSE 0
+			END as avg_latency_ms
+		FROM tool_stats
+		WHERE server_name != ''`
+
+	var args []interface{}
+
+	if !filter.From.IsZero() {
+		query += " AND date >= ?"
+		args = append(args, filter.From.Format("2006-01-02"))
+	}
+
+	if !filter.To.IsZero() {
+		query += " AND date <= ?"
+		args = append(args, filter.To.Format("2006-01-02"))
+	}
+
+	query += " GROUP BY server_name ORDER BY total_calls DESC"
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("querying MCP stats: %w", err)
+	}
+	defer rows.Close()
+
+	var stats []MCPServerStats
+	for rows.Next() {
+		var st MCPServerStats
+		err := rows.Scan(&st.ServerName, &st.TotalCalls, &st.SuccessCount, &st.ErrorCount, &st.AvgLatencyMs)
+		if err != nil {
+			return nil, fmt.Errorf("scanning MCP stats: %w", err)
+		}
+		stats = append(stats, st)
+	}
+
+	return stats, rows.Err()
+}
+
+// GetCallVolumeByHour retrieves hourly call counts for sparkline display.
+func (s *SQLiteStore) GetCallVolumeByHour(ctx context.Context, filter TimeFilter) ([]HourlyCallVolume, error) {
+	query := `
+		SELECT date, SUM(call_count) as calls
+		FROM tool_stats
+		WHERE 1=1`
+
+	var args []interface{}
+
+	if !filter.From.IsZero() {
+		query += " AND date >= ?"
+		args = append(args, filter.From.Format("2006-01-02"))
+	}
+
+	if !filter.To.IsZero() {
+		query += " AND date <= ?"
+		args = append(args, filter.To.Format("2006-01-02"))
+	}
+
+	query += " GROUP BY date ORDER BY date"
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("querying call volume: %w", err)
+	}
+	defer rows.Close()
+
+	var volumes []HourlyCallVolume
+	for rows.Next() {
+		var v HourlyCallVolume
+		var date string
+		err := rows.Scan(&date, &v.TotalCalls)
+		if err != nil {
+			return nil, fmt.Errorf("scanning call volume: %w", err)
+		}
+		v.Hour, _ = time.Parse("2006-01-02", date)
+		volumes = append(volumes, v)
+	}
+
+	return volumes, rows.Err()
+}
+
+// HasEventFingerprint checks if an event fingerprint already exists.
+func (s *SQLiteStore) HasEventFingerprint(ctx context.Context, fingerprint string) (bool, error) {
+	var exists int
+	err := s.db.QueryRowContext(ctx,
+		"SELECT 1 FROM event_fingerprints WHERE fingerprint = ? LIMIT 1",
+		fingerprint).Scan(&exists)
+
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("checking fingerprint: %w", err)
+	}
+	return true, nil
+}
+
+// StoreEventFingerprint stores an event fingerprint for deduplication.
+func (s *SQLiteStore) StoreEventFingerprint(ctx context.Context, fingerprint string, timestamp time.Time) error {
+	_, err := s.db.ExecContext(ctx,
+		"INSERT OR IGNORE INTO event_fingerprints (fingerprint, created_at) VALUES (?, ?)",
+		fingerprint, timestamp.Format(time.RFC3339))
+	return err
+}
+
+// CleanupFingerprints removes fingerprints older than the specified time.
+func (s *SQLiteStore) CleanupFingerprints(ctx context.Context, olderThan time.Time) (int64, error) {
+	result, err := s.db.ExecContext(ctx,
+		"DELETE FROM event_fingerprints WHERE created_at < ?",
+		olderThan.Format(time.RFC3339))
+	if err != nil {
+		return 0, fmt.Errorf("deleting old fingerprints: %w", err)
+	}
+
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("getting rows affected: %w", err)
+	}
+	return deleted, nil
 }

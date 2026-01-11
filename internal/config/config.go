@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -15,6 +16,7 @@ type Config struct {
 	Server    ServerConfig    `toml:"server"`
 	Storage   StorageConfig   `toml:"storage"`
 	Dashboard DashboardConfig `toml:"dashboard"`
+	TUI       TUIConfig       `toml:"tui"`
 	Cost      CostConfig      `toml:"cost"`
 	Alerts    AlertsConfig    `toml:"alerts"`
 }
@@ -28,7 +30,9 @@ type ServerConfig struct {
 
 // StorageConfig configures data storage.
 type StorageConfig struct {
+	DataDir       string `toml:"data_dir"`
 	DatabasePath  string `toml:"database_path"`
+	EventsFile    string `toml:"events_file"`
 	RetentionDays int    `toml:"retention_days"`
 }
 
@@ -36,6 +40,12 @@ type StorageConfig struct {
 type DashboardConfig struct {
 	RefreshInterval int    `toml:"refresh_interval"`
 	Theme           string `toml:"theme"`
+}
+
+// TUIConfig configures the terminal user interface.
+type TUIConfig struct {
+	RefreshInterval time.Duration `toml:"refresh_interval"`
+	DefaultRange    string        `toml:"default_range"`
 }
 
 // CostConfig configures cost calculation.
@@ -68,7 +78,9 @@ type AlertsConfig struct {
 // DefaultConfig returns the default configuration.
 func DefaultConfig() *Config {
 	homeDir, _ := os.UserHomeDir()
-	defaultDBPath := filepath.Join(homeDir, ".mcp-lens", "data.db")
+	dataDir := filepath.Join(homeDir, ".mcp-lens")
+	defaultDBPath := filepath.Join(dataDir, "data.db")
+	eventsFile := filepath.Join(dataDir, "events.jsonl")
 
 	return &Config{
 		Server: ServerConfig{
@@ -77,12 +89,18 @@ func DefaultConfig() *Config {
 			BindAddress:   "127.0.0.1",
 		},
 		Storage: StorageConfig{
+			DataDir:       dataDir,
 			DatabasePath:  defaultDBPath,
+			EventsFile:    eventsFile,
 			RetentionDays: 30,
 		},
 		Dashboard: DashboardConfig{
 			RefreshInterval: 30,
 			Theme:           "auto",
+		},
+		TUI: TUIConfig{
+			RefreshInterval: 5 * time.Second,
+			DefaultRange:    "24h",
 		},
 		Cost: CostConfig{
 			Models: ModelPricing{

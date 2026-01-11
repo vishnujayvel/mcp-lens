@@ -8,18 +8,20 @@ import (
 
 // MockStore is an in-memory implementation of Store for testing.
 type MockStore struct {
-	mu       sync.RWMutex
-	events   []Event
-	sessions map[string]*Session
-	nextID   int64
+	mu           sync.RWMutex
+	events       []Event
+	sessions     map[string]*Session
+	fingerprints map[string]time.Time
+	nextID       int64
 }
 
 // NewMockStore creates a new mock store.
 func NewMockStore() *MockStore {
 	return &MockStore{
-		events:   make([]Event, 0),
-		sessions: make(map[string]*Session),
-		nextID:   1,
+		events:       make([]Event, 0),
+		sessions:     make(map[string]*Session),
+		fingerprints: make(map[string]time.Time),
+		nextID:       1,
 	}
 }
 
@@ -320,6 +322,68 @@ func (m *MockStore) Close() error {
 	return nil
 }
 
+// GetRecentEvents retrieves the most recent events.
+func (m *MockStore) GetRecentEvents(ctx context.Context, limit int) ([]RecentEvent, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []RecentEvent
+	// Get events in reverse order (most recent first)
+	for i := len(m.events) - 1; i >= 0 && len(result) < limit; i-- {
+		e := m.events[i]
+		result = append(result, RecentEvent{
+			ID:         e.ID,
+			Timestamp:  e.CreatedAt,
+			SessionID:  e.SessionID,
+			EventType:  e.EventType,
+			ToolName:   e.ToolName,
+			ServerName: e.MCPServer,
+			DurationMs: e.DurationMs,
+			Success:    e.Success,
+		})
+	}
+
+	return result, nil
+}
+
+// GetCallVolumeByHour retrieves hourly call counts.
+func (m *MockStore) GetCallVolumeByHour(ctx context.Context, filter TimeFilter) ([]HourlyCallVolume, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// Group by hour
+	hourlyMap := make(map[string]*HourlyCallVolume)
+
+	for _, e := range m.events {
+		// Apply time filter
+		if !filter.From.IsZero() && e.CreatedAt.Before(filter.From) {
+			continue
+		}
+		if !filter.To.IsZero() && e.CreatedAt.After(filter.To) {
+			continue
+		}
+
+		hourKey := e.CreatedAt.Truncate(time.Hour).Format(time.RFC3339)
+		if _, exists := hourlyMap[hourKey]; !exists {
+			hourlyMap[hourKey] = &HourlyCallVolume{
+				Hour: e.CreatedAt.Truncate(time.Hour),
+			}
+		}
+
+		hourlyMap[hourKey].TotalCalls++
+		if !e.Success {
+			hourlyMap[hourKey].Errors++
+		}
+	}
+
+	var result []HourlyCallVolume
+	for _, v := range hourlyMap {
+		result = append(result, *v)
+	}
+
+	return result, nil
+}
+
 // EventCount returns the number of stored events (for testing).
 func (m *MockStore) EventCount() int {
 	m.mu.RLock()
@@ -333,5 +397,37 @@ func (m *MockStore) Reset() {
 	defer m.mu.Unlock()
 	m.events = make([]Event, 0)
 	m.sessions = make(map[string]*Session)
+	m.fingerprints = make(map[string]time.Time)
 	m.nextID = 1
+}
+
+// HasEventFingerprint checks if a fingerprint exists.
+func (m *MockStore) HasEventFingerprint(ctx context.Context, fingerprint string) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	_, exists := m.fingerprints[fingerprint]
+	return exists, nil
+}
+
+// StoreEventFingerprint stores a fingerprint for deduplication.
+func (m *MockStore) StoreEventFingerprint(ctx context.Context, fingerprint string, timestamp time.Time) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.fingerprints[fingerprint] = timestamp
+	return nil
+}
+
+// CleanupFingerprints removes old fingerprints.
+func (m *MockStore) CleanupFingerprints(ctx context.Context, olderThan time.Time) (int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var deleted int64
+	for fp, ts := range m.fingerprints {
+		if ts.Before(olderThan) {
+			delete(m.fingerprints, fp)
+			deleted++
+		}
+	}
+	return deleted, nil
 }

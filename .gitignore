@@ -3,6 +3,9 @@
 /build/
 /dist/
 
+# Claude Code specs (internal development docs)
+.claude/
+
 # Database
 *.db
 *.sqlite

@@ -157,7 +157,9 @@ func TestCalculateCost(t *testing.T) {
 	cost := cfg.CalculateCost("opus", inputTokens, outputTokens)
 	expectedCost := (float64(inputTokens) / 1_000_000 * 15.0) + (float64(outputTokens) / 1_000_000 * 75.0)
 
-	if cost != expectedCost {
+	// Use tolerance for floating point comparison
+	tolerance := 0.000001
+	if diff := cost - expectedCost; diff > tolerance || diff < -tolerance {
 		t.Errorf("expected cost %f, got %f", expectedCost, cost)
 	}
 }

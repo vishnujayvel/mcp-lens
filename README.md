@@ -2,7 +2,7 @@
 
 > Lightweight observability dashboard for Claude Code with MCP server intelligence
 
-**Status**: Implementation In Progress
+**Status**: Beta
 
 ## Why MCP Lens?
 
@@ -19,14 +19,22 @@ Existing Claude Code analytics tools focus on token usage and costs. MCP Lens fi
 # Build
 make build
 
-# Generate Claude Code hook configuration
-./mcp-lens init > ~/.config/claude/hooks.json
+# Initialize data directory and see hook configuration
+./mcp-lens init
 
-# Start MCP Lens
-./mcp-lens serve
+# Add the hook to your Claude Code settings (~/.claude/settings.json)
+# In the "hooks.PostToolUse" section, add:
+{
+  "type": "command",
+  "command": "/path/to/mcp-lens-hook.sh"
+}
 
-# Open dashboard
-open http://localhost:9877
+# After using Claude Code, sync events and view stats
+./mcp-lens sync
+./mcp-lens stats
+
+# Or launch the interactive TUI dashboard
+./mcp-lens
 ```
 
 ## Features
@@ -34,20 +42,20 @@ open http://localhost:9877
 ### Implemented
 - [x] Local SQLite storage with WAL mode
 - [x] Claude Code hooks integration (all hook events)
-- [x] Embedded web dashboard with HTMX
-- [x] Basic metrics: sessions, tokens, costs
+- [x] File-based JSONL event collection
+- [x] Interactive TUI dashboard
+- [x] Basic metrics: sessions, tool calls, error rates
 - [x] MCP server utilization tracking
 - [x] Tool call frequency and success rates
-- [x] Latency monitoring per MCP server
-- [x] Unused MCP server detection
-- [x] Cost forecasting (daily/weekly/monthly)
-- [x] Dark theme responsive UI
+- [x] Server health indicators (good/warning/critical/unused)
+- [x] Error severity analysis
+- [x] Real-time event streaming (`tail` command)
 
 ### Planned
+- [ ] Web dashboard with HTMX
 - [ ] Budget alerts and thresholds
 - [ ] Per-project cost breakdown
-- [ ] Session pattern analysis
-- [ ] Multi-agent session isolation
+- [ ] Token and cost tracking
 - [ ] Export to OTEL backends
 
 ## How It Works
@@ -55,41 +63,34 @@ open http://localhost:9877
 MCP Lens uses Claude Code's [hooks system](https://docs.anthropic.com/en/docs/claude-code/hooks) to capture tool invocations:
 
 ```
-Claude Code ──► PostToolUse Hook ──► MCP Lens ──► SQLite DB ──► Web Dashboard
+Claude Code ──► PostToolUse Hook ──► JSONL File ──► Sync ──► SQLite DB ──► Dashboard
 ```
 
 ## Commands
 
 ```bash
-mcp-lens serve      # Start the server (hooks + dashboard)
-mcp-lens init       # Generate Claude Code hook configuration
-mcp-lens status     # Show server status
+mcp-lens            # Launch interactive TUI dashboard
+mcp-lens init       # Initialize data directory and show hook config
+mcp-lens sync       # Sync events from JSONL to SQLite
+mcp-lens stats      # Show MCP server statistics (one-shot)
+mcp-lens tail       # Stream events in real-time
 mcp-lens purge      # Delete all data
 mcp-lens version    # Show version
 ```
 
 ## Configuration
 
-Create `~/.config/mcp-lens/config.toml`:
+Configuration is stored in `~/.mcp-lens/config.toml`:
 
 ```toml
-[server]
-hook_port = 9876
-dashboard_port = 9877
-bind_address = "127.0.0.1"
-
 [storage]
-database_path = "~/.mcp-lens/data.db"
+data_dir = "~/.mcp-lens"
+events_file = "events.jsonl"
+database = "data.db"
 retention_days = 30
 
 [dashboard]
-refresh_interval = 30
-theme = "auto"
-
-[cost.models]
-opus = { input = 15.0, output = 75.0 }
-sonnet = { input = 3.0, output = 15.0 }
-haiku = { input = 0.25, output = 1.25 }
+refresh_interval = 5
 ```
 
 ## Development
@@ -98,8 +99,11 @@ haiku = { input = 0.25, output = 1.25 }
 # Run tests
 make test
 
-# Build for all platforms
-make cross-compile
+# Run tests with race detector
+make test-race
+
+# Build
+make build
 
 # Format code
 make fmt
@@ -110,27 +114,28 @@ make fmt
 ```
 cmd/mcp-lens/       # CLI entrypoint
 internal/
+├── analytics/      # MCP utilization and error analysis
+├── cli/            # Command implementations
+├── collector/      # JSONL parsing and sync engine
 ├── config/         # Configuration management
-├── hooks/          # Hook receiver and event processing
+├── hooks/          # Hook event payload handling
 ├── storage/        # SQLite storage layer
-├── metrics/        # Metrics calculation
-└── web/            # Dashboard handlers and templates
+└── tui/            # Terminal UI dashboard
 web/
-├── templates/      # HTML templates
-└── static/         # CSS, JS assets
+├── templates/      # HTML templates (future)
+└── static/         # CSS assets (future)
 ```
 
 ## Tech Stack
 
 - **Language**: Go 1.21+
 - **Database**: SQLite (via modernc.org/sqlite, pure Go)
-- **Web**: Echo v4 + HTMX
-- **Templates**: Go html/template
+- **TUI**: termui/v3
 
 ## Related Projects
 
-- [ccusage](https://github.com/ryoppippi/ccusage) - CLI usage analysis (9.7k stars)
-- [Claude-Code-Usage-Monitor](https://github.com/Maciek-roboblog/Claude-Code-Usage-Monitor) - Terminal UI (6.1k stars)
+- [ccusage](https://github.com/ryoppippi/ccusage) - CLI usage analysis
+- [Claude-Code-Usage-Monitor](https://github.com/Maciek-roboblog/Claude-Code-Usage-Monitor) - Terminal UI
 - [claude-code-otel](https://github.com/ColeMurray/claude-code-otel) - Full OTEL stack
 
 ## License
