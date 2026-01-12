@@ -2,7 +2,9 @@
 
 > Lightweight observability dashboard for Claude Code with MCP server intelligence
 
-**Status**: Beta
+[![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://go.dev)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?style=flat&logo=sqlite)](https://www.sqlite.org/)
 
 ## Why MCP Lens?
 
@@ -10,7 +12,7 @@ Existing Claude Code analytics tools focus on token usage and costs. MCP Lens fi
 
 - **MCP Server Observability**: Track which MCP servers you actually use, their latency, and error rates
 - **Unused Server Detection**: Identify MCP servers you've configured but never call
-- **Lightweight Local Dashboard**: SQLite + embedded web UI (no Prometheus/Grafana stack required)
+- **Lightweight Local Dashboard**: SQLite + TUI (no Prometheus/Grafana stack required)
 - **Privacy-First**: All data stored locally by default
 
 ## Quick Start
@@ -39,32 +41,67 @@ make build
 
 ## Features
 
-### Implemented
-- [x] Local SQLite storage with WAL mode
-- [x] Claude Code hooks integration (all hook events)
-- [x] File-based JSONL event collection
-- [x] Interactive TUI dashboard
-- [x] Basic metrics: sessions, tool calls, error rates
-- [x] MCP server utilization tracking
-- [x] Tool call frequency and success rates
-- [x] Server health indicators (good/warning/critical/unused)
-- [x] Error severity analysis
-- [x] Real-time event streaming (`tail` command)
+- Local SQLite storage with WAL mode for concurrent access
+- Claude Code hooks integration (all hook events)
+- File-based JSONL event collection
+- Interactive TUI dashboard
+- MCP server utilization tracking with health indicators
+- Error severity analysis (low/medium/high/critical)
+- Real-time event streaming (`tail` command)
 
-### Planned
-- [ ] Web dashboard with HTMX
-- [ ] Budget alerts and thresholds
-- [ ] Per-project cost breakdown
-- [ ] Token and cost tracking
-- [ ] Export to OTEL backends
+## Architecture
 
-## How It Works
+### Design Principles
 
-MCP Lens uses Claude Code's [hooks system](https://docs.anthropic.com/en/docs/claude-code/hooks) to capture tool invocations:
+**Zero-Daemon Architecture**: MCP Lens doesn't run as a background process. Instead:
 
 ```
-Claude Code ──► PostToolUse Hook ──► JSONL File ──► Sync ──► SQLite DB ──► Dashboard
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   Claude Code   │────►│  Hook Script     │────►│  events.jsonl   │
+│   (your work)   │     │  (append-only)   │     │  (local file)   │
+└─────────────────┘     └──────────────────┘     └────────┬────────┘
+                                                          │
+                        ┌──────────────────┐              │ on-demand
+                        │   mcp-lens sync  │◄─────────────┘
+                        │   (batch ETL)    │
+                        └────────┬─────────┘
+                                 │
+                        ┌────────▼─────────┐
+                        │   SQLite + WAL   │
+                        │   (local DB)     │
+                        └────────┬─────────┘
+                                 │
+              ┌──────────────────┼──────────────────┐
+              │                  │                  │
+     ┌────────▼───────┐ ┌───────▼────────┐ ┌──────▼───────┐
+     │  mcp-lens tui  │ │ mcp-lens stats │ │ mcp-lens tail│
+     │  (dashboard)   │ │ (one-shot)     │ │ (streaming)  │
+     └────────────────┘ └────────────────┘ └──────────────┘
 ```
+
+**Why This Matters**:
+- **No CPU overhead**: Nothing runs until you explicitly invoke it
+- **No memory footprint**: Single binary, starts fast, exits when done
+- **Crash-proof**: Append-only JSONL survives any failure
+- **Portable**: Copy `~/.mcp-lens/` to any machine
+
+### Concurrency Model
+
+Uses SQLite's **Write-Ahead Logging (WAL)** for safe concurrent access:
+
+```go
+db, err := sql.Open("sqlite", dbPath+"?_pragma=journal_mode(WAL)")
+```
+
+- Multiple readers can query while sync writes
+- No lock contention between TUI refresh and data ingestion
+- Automatic crash recovery via WAL replay
+
+### Data Flow
+
+1. **Capture**: Claude Code hooks append JSON events to `events.jsonl`
+2. **Sync**: `mcp-lens sync` reads new events, deduplicates, stores to SQLite
+3. **Query**: Dashboard/stats read from SQLite (no file parsing)
 
 ## Commands
 
@@ -93,6 +130,20 @@ retention_days = 30
 refresh_interval = 5
 ```
 
+## Project Structure
+
+```
+cmd/mcp-lens/       # CLI entrypoint
+internal/
+├── analytics/      # MCP utilization and error analysis
+├── cli/            # Command implementations
+├── collector/      # JSONL parsing and sync engine
+├── config/         # Configuration management
+├── hooks/          # Hook event payload handling
+├── storage/        # SQLite storage layer (WAL mode)
+└── tui/            # Terminal UI dashboard
+```
+
 ## Development
 
 ```bash
@@ -109,27 +160,10 @@ make build
 make fmt
 ```
 
-## Architecture
-
-```
-cmd/mcp-lens/       # CLI entrypoint
-internal/
-├── analytics/      # MCP utilization and error analysis
-├── cli/            # Command implementations
-├── collector/      # JSONL parsing and sync engine
-├── config/         # Configuration management
-├── hooks/          # Hook event payload handling
-├── storage/        # SQLite storage layer
-└── tui/            # Terminal UI dashboard
-web/
-├── templates/      # HTML templates (future)
-└── static/         # CSS assets (future)
-```
-
 ## Tech Stack
 
-- **Language**: Go 1.21+
-- **Database**: SQLite (via modernc.org/sqlite, pure Go)
+- **Language**: Go 1.21+ (single binary, no runtime dependencies)
+- **Database**: SQLite with WAL (via modernc.org/sqlite, pure Go)
 - **TUI**: termui/v3
 
 ## Related Projects
