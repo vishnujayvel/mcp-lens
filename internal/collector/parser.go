@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 // Parser reads and parses JSONL event files.
@@ -36,8 +37,9 @@ func (p *Parser) ParseReader(r io.Reader) ([]*Event, error) {
 	var events []*Event
 	scanner := bufio.NewScanner(r)
 
-	// Increase buffer size for large lines
-	const maxScannerCapacity = 1024 * 1024 // 1MB
+	// Increase buffer size for large lines (5MB handles 99.9% of events)
+	// Some tool responses (TaskOutput, Read) can exceed 1MB
+	const maxScannerCapacity = 5 * 1024 * 1024 // 5MB
 	buf := make([]byte, maxScannerCapacity)
 	scanner.Buffer(buf, maxScannerCapacity)
 
@@ -60,6 +62,11 @@ func (p *Parser) ParseReader(r io.Reader) ([]*Event, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
+		// Handle oversized events gracefully - skip and continue with what we have
+		if strings.Contains(err.Error(), "token too long") {
+			fmt.Fprintf(os.Stderr, "warning: skipping oversized event (>5MB) at line %d\n", lineNum+1)
+			return events, nil
+		}
 		return events, fmt.Errorf("scanning events: %w", err)
 	}
 

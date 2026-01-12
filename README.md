@@ -1,14 +1,16 @@
 # MCP Lens
 
-> Lightweight observability dashboard for Claude Code with MCP server intelligence
+> MCP server observability for Claude Code CLI
 
 [![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://go.dev)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?style=flat&logo=sqlite)](https://www.sqlite.org/)
 
+**Built for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) users.** Track which MCP servers you actually use, find unused configurations, and monitor health.
+
 ## Why MCP Lens?
 
-Existing Claude Code analytics tools focus on token usage and costs. MCP Lens fills a gap by providing:
+Existing Claude Code analytics tools focus on token usage and costs. MCP Lens fills a different gap:
 
 - **MCP Server Observability**: Track which MCP servers you actually use, their latency, and error rates
 - **Unused Server Detection**: Identify MCP servers you've configured but never call
