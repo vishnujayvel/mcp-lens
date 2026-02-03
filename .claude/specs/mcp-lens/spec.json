@@ -5,12 +5,18 @@
   "status": "requirements",
   "language": "en",
   "created": "2026-01-09",
-  "updated": "2026-01-09",
+  "updated": "2026-02-03",
   "phases": {
-    "requirements": "in_progress",
+    "requirements": "generated",
     "design": "pending",
     "tasks": "pending",
     "implementation": "pending"
+  },
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": false
+    }
   },
   "tags": ["observability", "claude-code", "mcp", "telemetry", "dashboard"]
 }
