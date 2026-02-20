@@ -1,0 +1,32 @@
+language: "en-US"
+early_access: false
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  auto_review:
+    enabled: true
+    drafts: false
+  path_instructions:
+    - path: "cmd/**/*.go"
+      instructions: >
+        Go CLI commands. Check for proper error handling, consistent flag naming,
+        and that commands follow the cobra pattern used in the project.
+    - path: "internal/**/*.go"
+      instructions: >
+        Core library code. Review for Go idioms, proper interface usage,
+        error wrapping, and thread safety where applicable.
+    - path: "web/**"
+      instructions: >
+        Web dashboard files. Check for XSS vulnerabilities in template rendering,
+        proper asset paths, and responsive design considerations.
+    - path: "test/**"
+      instructions: >
+        Test files. Verify good coverage, table-driven tests where appropriate,
+        and that test names clearly describe what's being tested.
+
+chat:
+  auto_reply: true
